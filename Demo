@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radio Borya 2.0 — демо плеера</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',Arial,sans-serif; background:#0a0a0c; color:#fff; min-height:100vh; }
+  .wrap { max-width:880px; margin:auto; padding:0 16px 90px; }
+
+  header { display:flex; justify-content:space-between; align-items:center; padding:18px 0; }
+  .brand { font-weight:800; font-size:1.2rem; display:flex; align-items:center; gap:8px; }
+  .brand .dot { width:9px; height:9px; border-radius:50%; background:#3ddc84; box-shadow:0 0 8px #3ddc84; animation:pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity:.4; } }
+  .demo-badge { font-size:.7rem; border:1px solid #333; color:#888; padding:4px 10px; border-radius:20px; letter-spacing:1px; }
+
+  /* Плеер */
+  .player { background:#121216; border:1px solid #1f1f26; border-radius:20px; padding:28px; margin-top:12px; }
+  .cover { border-radius:14px; width:100%; aspect-ratio:16/9; display:flex; align-items:flex-start; padding:22px; font-weight:700; font-size:1.15rem; color:#fff; margin-bottom:24px; position:relative; overflow:hidden; }
+  .cover::after { content:''; position:absolute; inset:0; background:repeating-radial-gradient(circle at 80% 120%, transparent 0 18px, rgba(255,255,255,.05) 18px 19px); }
+  .track-now { margin-bottom:6px; }
+  .track-now .lbl { font-size:.75rem; color:#8b8b96; letter-spacing:1px; text-transform:uppercase; }
+  .track-now h1 { font-size:1.7rem; margin:4px 0 2px; }
+  .track-now .artist { color:#8b8b96; font-size:1.05rem; }
+  .live { color:#ff4d6d; font-weight:700; font-size:.8rem; letter-spacing:1px; }
+  .live::before { content:'●'; margin-right:6px; animation:pulse 1.2s infinite; }
+
+  .progress { height:5px; background:#26262e; border-radius:3px; margin:22px 0 8px; overflow:hidden; }
+  .progress i { display:block; height:100%; background:linear-gradient(90deg,#ff4d6d,#b04df0); width:0%; transition:width 1s linear; }
+  .times { display:flex; justify-content:space-between; font-size:.78rem; color:#6b6b76; }
+
+  .viz { width:100%; height:64px; margin:18px 0; }
+
+  .controls { display:flex; align-items:center; gap:18px; justify-content:center; margin:8px 0 20px; }
+  .play { width:64px; height:64px; border-radius:50%; border:none; background:#fff; color:#0a0a0c; font-size:1.4rem; cursor:pointer; transition:transform .15s; }
+  .play:hover { transform:scale(1.06); }
+  .ctl { background:none; border:none; color:#8b8b96; font-size:1.05rem; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px; font-family:inherit; }
+  .ctl small { font-size:.62rem; letter-spacing:.5px; }
+  .ctl:hover { color:#fff; }
+  input[type=range] { accent-color:#ff4d6d; width:130px; }
+
+  /* Очередь и история */
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:26px; }
+  .panel { background:#121216; border:1px solid #1f1f26; border-radius:16px; padding:20px; }
+  .panel h2 { font-size:.95rem; letter-spacing:1px; text-transform:uppercase; color:#8b8b96; margin-bottom:14px; }
+  .q-item { display:flex; gap:12px; align-items:center; padding:9px 0; border-bottom:1px solid #1c1c22; }
+  .q-item:last-child { border:none; }
+  .q-thumb { width:42px; height:42px; border-radius:9px; flex-shrink:0; }
+  .q-item .t { font-size:.92rem; }
+  .q-item .a { font-size:.78rem; color:#8b8b96; }
+  .q-item .time { margin-left:auto; font-size:.75rem; color:#6b6b76; white-space:nowrap; }
+  .badge-next { background:#2a1a2e; color:#d98cff; font-size:.62rem; padding:3px 8px; border-radius:10px; letter-spacing:1px; }
+  .hist .t { color:#c9c9d2; }
+
+  @media(max-width:680px){ .cols { grid-template-columns:1fr; } .track-now h1 { font-size:1.3rem; } header { flex-wrap:wrap; gap:10px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand"><span class="dot"></span> Radio Borya 2.0</div>
+    <span class="demo-badge">ДЕМО · FM 14.88</span>
+  </header>
+
+  <div class="player">
+    <div class="cover" id="cover">Radio Borya 2.0</div>
+
+    <div class="track-now">
+      <span class="lbl">Сейчас в эфире <span class="live">LIVE</span></span>
+      <h1 id="now-title">—</h1>
+      <div class="artist" id="now-artist">—</div>
+    </div>
+
+    <div class="progress"><i id="bar"></i></div>
+    <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+
+    <canvas class="viz" id="viz"></canvas>
+
+    <div class="controls">
+      <button class="ctl" onclick="skipTrack()" title="Пропустить трек">⏭<small>ПРОПУСТИТЬ</small></button>
+      <button class="play" id="playBtn" onclick="togglePlay()">▶</button>
+      <button class="ctl" onclick="shareTrack()">↗<small>ПОДЕЛИТЬСЯ</small></button>
+      <div style="display:flex;align-items:center;gap:8px;color:#8b8b96;">🔊<input type="range" min="0" max="100" value="70"></div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="panel">
+      <h2>Далее в эфире</h2>
+      <div id="queue"></div>
+    </div>
+    <div class="panel">
+      <h2>История эфира</h2>
+      <div id="history" class="hist"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- Демо-данные эфира ---
+var TRACKS = [
+  {artist:"Мультикаст", title:"kme_dota & kurbat_go", dur:212, c1:"#4f7bd9", c2:"#b04df0"},
+  {artist:"Ivan Zolo", title:"Marabu", dur:177, c1:"#d94f7b", c2:"#f04da8"},
+  {artist:"DJ Borya", title:"Лютейшая ссанина (ремикс)", dur:243, c1:"#4dd98c", c2:"#4db8f0"},
+  {artist:"Гаражный диско", title:"Нейросети и пиво", dur:198, c1:"#f0a44d", c2:"#f04d4d"},
+  {artist:"KurillaBeats", title:"Полночь на Лиговке", dur:226, c1:"#9b4df0", c2:"#4d6df0"},
+  {artist:"Bass Bazuka", title:"FM 14.88 навсегда", dur:201, c1:"#f04d8c", c2:"#7b4df0"}
+];
+var queue = TRACKS.slice(1, 4);
+var history = [{artist:"Сектор Газа", title:"Колхозный панк", dur:187, time:"1:04", c1:"#555", c2:"#888"}];
+var current = TRACKS[0];
+var pos = 47, playing = false, speed = 1; // speed: ускорение для демо
+
+function fmt(s){ s=Math.floor(s); return Math.floor(s/60)+":"+("0"+s%60).slice(-2); }
+
+function render(){
+  document.getElementById("now-title").textContent = current.title;
+  document.getElementById("now-artist").textContent = current.artist;
+  document.getElementById("dur").textContent = fmt(current.dur);
+  var cover = document.getElementById("cover");
+  cover.style.background = "linear-gradient(135deg,"+current.c1+","+current.c2+")";
+  cover.firstChild.textContent = current.artist + " — " + current.title;
+
+  var q = document.getElementById("queue"); q.innerHTML = "";
+  var t = pos, now = new Date();
+  queue.forEach(function(tr, i){
+    var start = now.getTime() + (tr.dur - 0)*0 + t*1000/speed; // демо-время
+    t += tr.dur;
+    var d = new Date(Date.now() + (i===0 ? (current.dur-pos) : t - current.dur + pos)*1000/speed);
+    var hh = d.getHours()+":"+("0"+d.getMinutes()).slice(-2);
+    q.innerHTML += '<div class="q-item"><div class="q-thumb" style="background:linear-gradient(135deg,'+tr.c1+','+tr.c2+')"></div><div><div class="t">'+tr.title+'</div><div class="a">'+tr.artist+'</div></div>'+(i===0?'<span class="badge-next">СЛЕДУЮЩИЙ</span>':'')+'<span class="time">'+hh+'</span></div>';
+  });
+
+  var h = document.getElementById("history"); h.innerHTML = "";
+  history.slice(0,5).forEach(function(tr){
+    h.innerHTML += '<div class="q-item"><div class="q-thumb" style="background:linear-gradient(135deg,'+tr.c1+','+tr.c2+')"></div><div><div class="t">'+tr.title+'</div><div class="a">'+tr.artist+'</div></div><span class="time">'+tr.time+'</span></div>';
+  });
+}
+
+// --- Симуляция live-эфира ---
+function tick(){
+  if(!playing) return;
+  pos += 1*speed;
+  if(pos >= current.dur) nextTrack(true);
+  document.getElementById("bar").style.width = (pos/current.dur*100)+"%";
+  document.getElementById("cur").textContent = fmt(pos);
+}
+
+function nextTrack(auto){
+  var d = new Date();
+  history.unshift({artist:current.artist, title:current.title, dur:current.dur,
+                   time:d.getHours()+":"+("0"+d.getMinutes()).slice(-2), c1:current.c1, c2:current.c2});
+  queue.push(TRACKS[Math.floor(Math.random()*TRACKS.length)]);
+  current = queue.shift();
+  pos = 0;
+  render();
+}
+
+function skipTrack(){ if(confirm("Пропустить трек для всех слушателей? (дёмо-режим админа)")) nextTrack(false); }
+
+function togglePlay(){
+  playing = !playing;
+  document.getElementById("playBtn").textContent = playing ? "⏸" : "▶";
+}
+
+function shareTrack(){
+  var text = "Сейчас на Radio Borya 2.0: " + current.artist + " — " + current.title;
+  if(navigator.clipboard){ navigator.clipboard.writeText(text + " | radioborya2.demo"); }
+  alert("Скопировано для шаринга:\n\n" + text);
+}
+
+setInterval(tick, 1000);
+
+// --- Визуализатор (Web Audio API, демо-анимация) ---
+var cv = document.getElementById("viz"), ctx = cv.getContext("2d");
+function drawViz(){
+  cv.width = cv.clientWidth; cv.height = 64;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  var bars = 48, bw = cv.width/bars;
+  for(var i=0;i<bars;i++){
+    var amp = playing ? (Math.sin(Date.now()/160 + i*.55)*.5+.5)*54+6 : 4;
+    var g = ctx.createLinearGradient(0,64,0,64-amp);
+    g.addColorStop(0,"#ff4d6d"); g.addColorStop(1,"#b04df0");
+    ctx.fillStyle = g;
+    ctx.fillRect(i*bw+1, 64-amp, bw-2, amp);
+  }
+  requestAnimationFrame(drawViz);
+}
+drawViz();
+render();
+</script>
+</body>
+</html>
